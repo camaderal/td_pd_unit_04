@@ -3,5 +3,5 @@ env
 backup.csv
 *.db
 
-/__pychache__
+\__pycache__
 .vscode
