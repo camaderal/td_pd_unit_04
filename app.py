@@ -4,11 +4,11 @@ import datetime
 from sqlalchemy.exc import NoResultFound 
 from models import (Base, session, engine, Product)
 
-def add_product_to_db(name, price, qty, upd_dt, show_msg=False):
+def add_product_to_db(name, qty, price, upd_dt, show_msg=False):
     product = session.query(Product).filter(Product.product_name == name).one_or_none()
 
     if product == None:
-        product = Product(product_name=name, product_price=price, product_quantity=qty, date_updated=upd_dt)
+        product = Product(product_name=name, product_quantity=qty,  product_price=price, date_updated=upd_dt)
         session.add(product)
         session.commit()
 
@@ -17,8 +17,8 @@ def add_product_to_db(name, price, qty, upd_dt, show_msg=False):
 
     elif product.date_updated <= upd_dt:
         product.product_name=name
-        product.product_price=price
         product.product_quantity=qty
+        product.product_price=price
         product.date_updated=upd_dt
         session.commit()
 
@@ -33,6 +33,9 @@ def add_product_to_db(name, price, qty, upd_dt, show_msg=False):
         time.sleep(1.5)
     
 
+def format_qty(qty):
+    return int(qty)
+
 
 def format_price(price):
     price = price.replace("$", "")
@@ -41,16 +44,30 @@ def format_price(price):
 
     return price
 
+
 def reformat_price(price):
-    return "$" + str(price * .01)
-
-
-def format_qty(qty):
-    return int(qty)
+    return "$" + "{:.2f}".format(price * .01)
 
 
 def format_upd_dt(upd_dt):
-    return datetime.datetime.strptime(upd_dt, "%m/%d/%Y").date()
+    return datetime.datetime.strptime(upd_dt, "%m/%d/%Y")
+
+
+def reformat_upd_dt(upd_dt):
+    return datetime.datetime.strftime(upd_dt, "%m/%d/%Y %H:%M:%S")
+
+
+def ask_qty():
+    while True:
+        qty = input("Input quantity: ");
+        try:
+            return format_qty(qty)
+        except ValueError:
+            input('''
+                \nInvalid input. 
+                \rPlease only input integer values(e.g: 25). 
+                \rPress enter to try again.''')
+
 
 def ask_price():
     while True:
@@ -66,37 +83,16 @@ def ask_price():
                 \rPress enter to try again.''')
 
 
-def ask_qty():
-    while True:
-        qty = input("Input quantity: ");
-        try:
-            return format_qty(qty)
-        except ValueError:
-            input('''
-                \nInvalid input. 
-                \rPlease only input numerical values(e.g: 25). 
-                \rPress enter to try again.''')
-
-
 def init_products():
     with open('inventory.csv') as csv_file:
         products = list(csv.reader(csv_file))
         for product in products[1:]:
             name = product[0]
-            price = format_price(product[1])
             qty = format_qty(product[2])
+            price = format_price(product[1])
             upd_dt = format_upd_dt(product[3])
-            add_product_to_db(name, price, qty, upd_dt)
+            add_product_to_db(name, qty, price, upd_dt)
            
-
-def add_product():
-    name = input("Input product name: ")
-    price = ask_price()
-    qty = ask_qty()
-    upd_dt = datetime.datetime.now().date()
-
-    add_product_to_db(name, price, qty, upd_dt, True)
-
 
 def view_product():
     while True:
@@ -104,23 +100,35 @@ def view_product():
         try:
             product = session.query(Product).filter_by(product_id=product_id).one()
         except NoResultFound as error:
-            print(f"The product with the product id of '{product_id}' does not exist. Please try again.")
+            input(f'''
+                \nThe product with the product id of '{product_id}' does not exist. 
+                \r\rPress enter to try again.''')
             continue
 
         print(f'''
             \n
             \rProduct Id: {product.product_id}
             \rName: {product.product_name}
-            \rPrice: {reformat_price(product.product_price)}
             \rQuantity: {product.product_quantity}
-            \rDate Updated: {product.date_updated}
+            \rPrice: {reformat_price(product.product_price)}
+            \rDate Updated: {reformat_upd_dt(product.date_updated)}
             \r
         ''')
         input("Press any key to continue.")
         break
 
+
+def add_product():
+    name = input("Input product name: ")
+    qty = ask_qty()
+    price = ask_price()
+    upd_dt = datetime.datetime.now()
+
+    add_product_to_db(name, qty, price, upd_dt, True)
+
+
 def backup_inventory():
-    fieldnames = ["product_id","product_name","product_price","product_quantity","date_updated"]
+    fieldnames = ["product_id","product_name","product_quantity","product_price","date_updated"]
     with open(file='backup.csv', mode="w", newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -129,11 +137,12 @@ def backup_inventory():
             writer.writerow({
                 "product_id": product.product_id,
                 "product_name": product.product_name,
-                "product_price": product.product_price,
                 "product_quantity": product.product_quantity,
+                "product_price": product.product_price,
                 "date_updated": product.date_updated,
 
             })
+
 
 def show_menu():
     while True:
@@ -161,6 +170,7 @@ def show_menu():
         else:
             print("Good day!")
             break
+
 
 if __name__ == "__main__":
     Base.metadata.create_all(engine)
